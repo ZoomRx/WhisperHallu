@@ -30,13 +30,13 @@ if(useSileroVAD):
      VADIterator,
      collect_chunks) = utils
 
-useSpleeter=False
-if(useSpleeter):
-    from spleeter.audio import STFTBackend
-    backend = STFTBackend.LIBROSA
-    from spleeter.separator import Separator
-    print("Using spleeter:2stems-16kHz")
-    separator = Separator('spleeter:2stems-16kHz',stft_backend=backend)
+# useSpleeter=False
+# if(useSpleeter):
+#     from spleeter.audio import STFTBackend
+#     backend = STFTBackend.LIBROSA
+#     from spleeter.separator import Separator
+#     print("Using spleeter:2stems-16kHz")
+#     separator = Separator('spleeter:2stems-16kHz',stft_backend=backend)
 
 useDemucs=True
 if(useDemucs):
@@ -62,7 +62,7 @@ try:
     from faster_whisper import WhisperModel
     print("Using Faster Whisper")
     whisperFound = "FSTR"
-    modelPath = "whisper-medium-ct2/"#"whisper-medium-ct2/" "whisper-large-ct2/"
+    modelPath = "whisper-small-en-ct2/"#"whisper-medium-ct2/" "whisper-large-ct2/"
     if not os.path.exists(modelPath):
         print("Faster installation found, but "+modelPath+" model not found")
         sys.exit(-1)
@@ -77,7 +77,7 @@ try:
 except ImportError as e:
     pass
 
-beam_size=2
+beam_size=5
 model = None
 device = "cuda" #cuda / cpu
 cudaIdx = 0
@@ -98,10 +98,12 @@ def loadModel(gpu: str,modelSize=None):
         if whisperFound == "FSTR":
             if(modelSize == "large"):
                 modelPath = "whisper-large-ct2/"
-            else:
+            elif (modelSize == "medium"):
                 modelPath = "whisper-medium-ct2/"
+            else:
+                modelPath = "whisper-small-en-ct2/"
             print("LOADING: "+modelPath+" GPU: "+gpu+" BS: "+str(beam_size))
-            compute_type="float16"# float16 int8_float16 int8
+            compute_type="int8"# float16 int8_float16 int8
             model = WhisperModel(modelPath, device=device,device_index=int(gpu), compute_type=compute_type)
         elif whisperFound == "STD":
             if(modelSize == None):
@@ -237,19 +239,19 @@ def transcribeOpts(path: str,opts: dict,lngInput=None,isMusic=False,onlySRT=Fals
     except:
          print("Warning: can't analyze duration")
 
-    if(useSpleeter):
-        startTime = time.time()
-        try:
-            spleeterDir=pathIn+".spleeter"
-            if(not os.path.exists(spleeterDir)):
-                os.mkdir(spleeterDir)
-            pathSpleeter=spleeterDir+"/"+os.path.splitext(os.path.basename(pathIn))[0]+"/vocals.wav"
-            separator.separate_to_file(pathIn, spleeterDir)
-            print("T=",(time.time()-startTime))
-            print("PATH="+pathSpleeter,flush=True)
-            pathNoCut = pathIn = pathSpleeter
-        except:
-             print("Warning: can't split vocals")
+    # if(useSpleeter):
+    #     startTime = time.time()
+    #     try:
+    #         spleeterDir=pathIn+".spleeter"
+    #         if(not os.path.exists(spleeterDir)):
+    #             os.mkdir(spleeterDir)
+    #         pathSpleeter=spleeterDir+"/"+os.path.splitext(os.path.basename(pathIn))[0]+"/vocals.wav"
+    #         separator.separate_to_file(pathIn, spleeterDir)
+    #         print("T=",(time.time()-startTime))
+    #         print("PATH="+pathSpleeter,flush=True)
+    #         pathNoCut = pathIn = pathSpleeter
+    #     except:
+    #          print("Warning: can't split vocals")
     
     if(useDemucs):
         startTime = time.time()
@@ -287,7 +289,7 @@ def transcribeOpts(path: str,opts: dict,lngInput=None,isMusic=False,onlySRT=Fals
             pathVAD = pathIn+".VAD.wav"
             wav = read_audio(pathIn, sampling_rate=SAMPLING_RATE)
             #https://github.com/snakers4/silero-vad/blob/master/utils_vad.py#L161
-            speech_timestamps = get_speech_timestamps(wav, modelVAD,threshold=0.5,min_silence_duration_ms=500, sampling_rate=SAMPLING_RATE)
+            speech_timestamps = get_speech_timestamps(wav, modelVAD,threshold=0.3,min_silence_duration_ms=500, sampling_rate=SAMPLING_RATE)
             save_audio(pathVAD,collect_chunks(speech_timestamps, wav), sampling_rate=SAMPLING_RATE)
             print("T=",(time.time()-startTime))
             print("PATH="+pathVAD,flush=True)
